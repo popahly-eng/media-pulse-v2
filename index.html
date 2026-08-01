@@ -47,8 +47,22 @@
     <!-- ============ MAIN ============ -->
     <main class="main">
 
-      <!-- ---- URL ---- -->
-      <section class="card" aria-labelledby="url-label">
+      <!-- ---- MESSAGE TYPE ---- -->
+      <section class="card" aria-labelledby="type-label">
+        <div class="card__head">
+          <span class="card__eyebrow">TYPE</span>
+          <span id="type-label" class="card__label">Message Type</span>
+        </div>
+        <div class="segmented segmented--4" role="radiogroup" aria-labelledby="type-label" id="typeGroup">
+          <button type="button" class="segmented__opt is-active" data-value="news" role="radio" aria-checked="true">News</button>
+          <button type="button" class="segmented__opt" data-value="text" role="radio" aria-checked="false">Text</button>
+          <button type="button" class="segmented__opt" data-value="link" role="radio" aria-checked="false">Link</button>
+          <button type="button" class="segmented__opt" data-value="file" role="radio" aria-checked="false">File</button>
+        </div>
+      </section>
+
+      <!-- ---- URL (NEWS) ---- -->
+      <section class="card type-panel" data-type="news" aria-labelledby="url-label">
         <div class="card__head">
           <span class="card__eyebrow">01</span>
           <label id="url-label" for="urlInput" class="card__label">News URL</label>
@@ -77,8 +91,8 @@
         <p id="urlHint" class="field-hint">We'll pull the headline automatically once you paste a link.</p>
       </section>
 
-      <!-- ---- TITLE ---- -->
-      <section class="card" aria-labelledby="title-label">
+      <!-- ---- TITLE (NEWS) ---- -->
+      <section class="card type-panel" data-type="news" aria-labelledby="title-label">
         <div class="card__head">
           <span class="card__eyebrow">02</span>
           <label id="title-label" for="titleInput" class="card__label">News Title</label>
@@ -89,6 +103,90 @@
           class="textarea"
           rows="3"
           placeholder="The headline will appear here — edit it freely before sending."
+        ></textarea>
+      </section>
+
+      <!-- ---- EDITORIAL SUMMARY (TEXT) ---- -->
+      <section class="card type-panel" data-type="text" aria-labelledby="summary-label" hidden>
+        <div class="card__head">
+          <span class="card__eyebrow">01</span>
+          <label id="summary-label" for="summaryInput" class="card__label">Editorial Summary</label>
+        </div>
+        <textarea
+          id="summaryInput"
+          class="textarea textarea--lg"
+          rows="6"
+          placeholder="Write the message exactly as it should be sent…"
+        ></textarea>
+      </section>
+
+      <!-- ---- LINK ---- -->
+      <section class="card type-panel" data-type="link" aria-labelledby="linkurl-label" hidden>
+        <div class="card__head">
+          <span class="card__eyebrow">01</span>
+          <label id="linkurl-label" for="linkUrlInput" class="card__label">Link URL</label>
+        </div>
+        <div class="input-wrap">
+          <svg class="input-wrap__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.36-1.36" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input
+            id="linkUrlInput"
+            type="url"
+            inputmode="url"
+            class="input"
+            placeholder="Paste a link…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <label for="linkTitleInput" class="field-label">Title <span class="field-label__opt">Optional</span></label>
+        <input
+          id="linkTitleInput"
+          type="text"
+          class="input input--stacked"
+          placeholder="A short title for this link…"
+          autocomplete="off"
+        />
+
+        <label for="linkDescInput" class="field-label">Description <span class="field-label__opt">Optional</span></label>
+        <textarea
+          id="linkDescInput"
+          class="textarea"
+          rows="3"
+          placeholder="A little more context about this link…"
+        ></textarea>
+      </section>
+
+      <!-- ---- FILE ---- -->
+      <section class="card type-panel" data-type="file" aria-labelledby="file-label" hidden>
+        <div class="card__head">
+          <span class="card__eyebrow">01</span>
+          <span id="file-label" class="card__label">File</span>
+        </div>
+
+        <input id="fileInput" type="file" class="file-input-native"
+               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*,video/*" />
+        <label for="fileInput" class="file-drop" id="fileDrop">
+          <svg class="file-drop__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 8l5-5 5 5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="file-drop__text">
+            <span id="fileDropLabel">Choose file</span>
+            <span class="file-drop__hint">PDF, Word, Excel, PowerPoint, image or video</span>
+          </span>
+        </label>
+
+        <label for="fileCaptionInput" class="field-label">Caption</label>
+        <textarea
+          id="fileCaptionInput"
+          class="textarea"
+          rows="3"
+          placeholder="Add a caption for this file…"
         ></textarea>
       </section>
 
@@ -168,6 +266,14 @@
               <span id="previewPriorityBadge" class="badge badge--urgent">🔴 URGENT</span>
             </div>
             <p id="previewTitle" class="wa-bubble__title">Your headline will appear here once you paste a link.</p>
+            <p id="previewDescription" class="wa-bubble__desc" hidden></p>
+            <p id="previewFileRow" class="wa-bubble__file" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 2v6h6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span id="previewFileName">No file selected</span>
+            </p>
             <a id="previewUrl" class="wa-bubble__link" href="#" target="_blank" rel="noopener noreferrer">example.com/article</a>
             <div class="wa-bubble__meta">
               <span id="previewTime" class="wa-bubble__time">10:24</span>
@@ -201,7 +307,7 @@
     <footer class="footer">
       <span>Media Pulse</span>
       <span class="footer__dot">·</span>
-      <span>Reads from Supabase, delivers through your webhook</span>
+      <span>Powered by n8n Automation</span>
     </footer>
 
   </div>

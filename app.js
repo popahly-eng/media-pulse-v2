@@ -11,10 +11,17 @@
    * State
    * --------------------------------------------------------------- */
   const state = {
+    messageType: "news", // 'news' | 'text' | 'link' | 'file'
     url: "",
     title: "",
     priority: "Normal",
     mode: "all", // 'all' | 'sector' | 'client'
+    summary: "",
+    linkUrl: "",
+    linkTitle: "",
+    linkDescription: "",
+    file: null,
+    fileCaption: "",
     sectors: [],       // [{ id, name }]
     clients: [],       // [{ id, name, sectorNames: [] }]
     selectedSectorIds: new Set(),
@@ -32,6 +39,24 @@
     urlHint: document.getElementById("urlHint"),
     fetchTitleBtn: document.getElementById("fetchTitleBtn"),
     titleInput: document.getElementById("titleInput"),
+
+    typeGroup: document.getElementById("typeGroup"),
+    typePanels: document.querySelectorAll(".type-panel"),
+
+    summaryInput: document.getElementById("summaryInput"),
+
+    linkUrlInput: document.getElementById("linkUrlInput"),
+    linkTitleInput: document.getElementById("linkTitleInput"),
+    linkDescInput: document.getElementById("linkDescInput"),
+
+    fileInput: document.getElementById("fileInput"),
+    fileDrop: document.getElementById("fileDrop"),
+    fileDropLabel: document.getElementById("fileDropLabel"),
+    fileCaptionInput: document.getElementById("fileCaptionInput"),
+
+    previewDescription: document.getElementById("previewDescription"),
+    previewFileRow: document.getElementById("previewFileRow"),
+    previewFileName: document.getElementById("previewFileName"),
 
     priorityGroup: document.getElementById("priorityGroup"),
     modeGroup: document.getElementById("modeGroup"),
@@ -123,41 +148,35 @@
   }
 
   /* ---------------------------------------------------------------
-   * n8n form data
+   * Recipient data (clients / sectors) — loaded from n8n
    * --------------------------------------------------------------- */
-  async function loadData() {
+  async function loadFormData() {
     el.sectorList.innerHTML = `<p class="empty-note">Loading sectors…</p>`;
     el.clientList.innerHTML = `<p class="empty-note">Loading clients…</p>`;
-
     try {
       const res = await fetch(CONFIG.FORM_DATA_URL);
-
       if (!res.ok) {
-        throw new Error(`Form data request failed (${res.status})`);
+        throw new Error(`Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      if (data?.success === false) {
+        throw new Error("Request did not succeed.");
       }
 
-      const data = await res.json();
-
-      state.sectors = Array.isArray(data.sectors) ? data.sectors : [];
       state.clients = Array.isArray(data.clients)
-        ? data.clients.map((client) => ({
-            ...client,
-            sectorNames: Array.isArray(client.sectorNames)
-              ? client.sectorNames
-              : [],
-          }))
+        ? data.clients.map((c) => ({ id: c.id, name: c.name, sectorNames: [] }))
+        : [];
+      state.sectors = Array.isArray(data.sectors)
+        ? data.sectors.map((s) => ({ id: s.id, name: s.name }))
         : [];
 
       renderSectorList();
       renderClientList();
     } catch (err) {
+      const message = `<p class="empty-note">Couldn't load recipients. Please try again later.</p>`;
+      el.sectorList.innerHTML = message;
+      el.clientList.innerHTML = message;
       console.error(err);
-
-      el.sectorList.innerHTML =
-        `<p class="empty-note">Couldn't load sectors.</p>`;
-
-      el.clientList.innerHTML =
-        `<p class="empty-note">Couldn't load clients.</p>`;
     }
   }
 
@@ -339,15 +358,63 @@
    * Preview
    * --------------------------------------------------------------- */
   function updatePreview() {
-    const title = el.titleInput.value.trim();
-    el.previewTitle.textContent = title || "Your headline will appear here once you paste a link.";
+    const type = state.messageType;
 
-    if (state.url && isValidUrl(state.url)) {
-      el.previewUrl.textContent = shortUrl(state.url);
-      el.previewUrl.href = state.url;
-      el.previewUrl.style.display = "";
-    } else {
-      el.previewUrl.style.display = "none";
+    // Reset optional rows; each branch below turns on what it needs.
+    el.previewDescription.hidden = true;
+    el.previewFileRow.hidden = true;
+    el.previewUrl.style.display = "none";
+
+    if (type === "news") {
+      const title = el.titleInput.value.trim();
+      el.previewTitle.textContent = title || "Your headline will appear here once you paste a link.";
+      el.previewTitle.hidden = false;
+
+      if (state.url && isValidUrl(state.url)) {
+        el.previewUrl.textContent = shortUrl(state.url);
+        el.previewUrl.href = state.url;
+        el.previewUrl.style.display = "";
+      }
+    } else if (type === "text") {
+      const summary = el.summaryInput.value.trim();
+      el.previewTitle.textContent = summary || "Your message will appear here exactly as typed.";
+      el.previewTitle.hidden = false;
+    } else if (type === "link") {
+      const linkTitle = el.linkTitleInput.value.trim();
+      const linkDesc = el.linkDescInput.value.trim();
+
+      if (linkTitle) {
+        el.previewTitle.textContent = linkTitle;
+        el.previewTitle.hidden = false;
+      } else {
+        el.previewTitle.hidden = true;
+      }
+
+      if (linkDesc) {
+        el.previewDescription.textContent = linkDesc;
+        el.previewDescription.hidden = false;
+      }
+
+      if (state.linkUrl && isValidUrl(state.linkUrl)) {
+        el.previewUrl.textContent = shortUrl(state.linkUrl);
+        el.previewUrl.href = state.linkUrl;
+        el.previewUrl.style.display = "";
+      }
+
+      if (!linkTitle && !linkDesc && !state.linkUrl) {
+        el.previewTitle.hidden = false;
+        el.previewTitle.textContent = "Your link preview will appear here.";
+      }
+    } else if (type === "file") {
+      el.previewTitle.hidden = true;
+      el.previewFileRow.hidden = false;
+      el.previewFileName.textContent = state.file ? state.file.name : "No file selected";
+
+      const caption = el.fileCaptionInput.value.trim();
+      if (caption) {
+        el.previewDescription.textContent = caption;
+        el.previewDescription.hidden = false;
+      }
     }
 
     const now = new Date();
@@ -379,18 +446,26 @@
   }
 
   /* ---------------------------------------------------------------
+   * Message Type switching
+   * --------------------------------------------------------------- */
+  function setMessageType(type) {
+    state.messageType = type;
+    showFormError(null);
+
+    el.typePanels.forEach((panel) => {
+      panel.hidden = panel.dataset.type !== type;
+    });
+
+    updatePreview();
+  }
+
+  /* ---------------------------------------------------------------
    * Mode (Send To) switching
    * --------------------------------------------------------------- */
   function setMode(mode) {
     state.mode = mode;
     el.sectorPanel.hidden = mode !== "sector";
     el.clientPanel.hidden = mode !== "client";
-
-    if ((mode === "sector" && !state.sectors.length) ||
-        (mode === "client" && !state.clients.length)) {
-      loadData();
-    }
-
     updatePreview();
   }
 
@@ -398,12 +473,29 @@
    * Validation
    * --------------------------------------------------------------- */
   function validate() {
-    if (!state.url || !isValidUrl(state.url)) {
-      return "Paste a valid news URL before sending.";
+    const type = state.messageType;
+
+    if (type === "news") {
+      if (!state.url || !isValidUrl(state.url)) {
+        return "Paste a valid news URL before sending.";
+      }
+      if (!el.titleInput.value.trim()) {
+        return "The news title can't be empty.";
+      }
+    } else if (type === "text") {
+      if (!el.summaryInput.value.trim()) {
+        return "Write an editorial summary before sending.";
+      }
+    } else if (type === "link") {
+      if (!state.linkUrl || !isValidUrl(state.linkUrl)) {
+        return "Paste a valid link URL before sending.";
+      }
+    } else if (type === "file") {
+      if (!state.file) {
+        return "Choose a file before sending.";
+      }
     }
-    if (!el.titleInput.value.trim()) {
-      return "The news title can't be empty.";
-    }
+
     if (state.mode === "sector" && state.selectedSectorIds.size === 0) {
       return "Select at least one sector.";
     }
@@ -416,6 +508,88 @@
   /* ---------------------------------------------------------------
    * Send
    * --------------------------------------------------------------- */
+  function buildPayload() {
+    const type = state.messageType;
+    const base = {
+      type,
+      url: "",
+      title: "",
+      description: "",
+      message: "",
+      caption: "",
+      priority: state.priority.toLowerCase(),
+      mode: state.mode,
+      sector_ids: state.mode === "sector" ? [...state.selectedSectorIds] : [],
+      client_ids: state.mode === "client" ? [...state.selectedClientIds] : [],
+    };
+
+    if (type === "news") {
+      base.url = state.url;
+      base.title = el.titleInput.value.trim();
+    } else if (type === "text") {
+      base.message = el.summaryInput.value.trim();
+    } else if (type === "link") {
+      base.url = state.linkUrl;
+      base.title = el.linkTitleInput.value.trim();
+      base.description = el.linkDescInput.value.trim();
+    } else if (type === "file") {
+      base.caption = el.fileCaptionInput.value.trim();
+    }
+
+    return base;
+  }
+
+  async function parseResponseSafely(res) {
+    try {
+      const text = await res.text();
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  async function sendJsonPayload(payload) {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseResponseSafely(res);
+    if (!res.ok || (data && data.success === false)) {
+      throw new Error(`Webhook responded with status ${res.status}`);
+    }
+    return data;
+  }
+
+  async function sendFilePayload(payload) {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (key === "sector_ids" || key === "client_ids") {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+    formData.append("file", state.file, state.file.name);
+
+    // Note: Content-Type is intentionally NOT set here — the browser
+    // must generate the multipart boundary itself.
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await parseResponseSafely(res);
+    if (!res.ok || (data && data.success === false)) {
+      throw new Error(`Webhook responded with status ${res.status}`);
+    }
+    return data;
+  }
+
   async function handleSend() {
     showFormError(null);
     const error = validate();
@@ -424,28 +598,17 @@
       return;
     }
 
-    const payload = {
-      url: state.url,
-      title: el.titleInput.value.trim(),
-      priority: state.priority,
-      mode: state.mode,
-      sector_ids: state.mode === "sector" ? [...state.selectedSectorIds] : [],
-      client_ids: state.mode === "client" ? [...state.selectedClientIds] : [],
-    };
+    const payload = buildPayload();
 
     state.sending = true;
     setButtonLoading(el.sendBtn, true);
     el.sendBtn.querySelector(".btn__check").hidden = true;
 
     try {
-      const res = await fetch(CONFIG.WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Webhook responded with status ${res.status}`);
+      if (state.messageType === "file") {
+        await sendFilePayload(payload);
+      } else {
+        await sendJsonPayload(payload);
       }
 
       setButtonLoading(el.sendBtn, false);
@@ -477,7 +640,7 @@
   el.urlInput.addEventListener("paste", () => {
     setTimeout(() => {
       state.url = el.urlInput.value.trim();
-      if (isValidUrl(state.url)) handleFetchTitle();
+      if (state.messageType === "news" && isValidUrl(state.url)) handleFetchTitle();
     }, 30);
   });
 
@@ -485,8 +648,44 @@
     updatePreview();
   });
 
+  el.summaryInput.addEventListener("input", (e) => {
+    state.summary = e.target.value;
+    updatePreview();
+  });
+
+  el.linkUrlInput.addEventListener("input", (e) => {
+    state.linkUrl = e.target.value.trim();
+    showFormError(null);
+    updatePreview();
+  });
+  el.linkTitleInput.addEventListener("input", (e) => {
+    state.linkTitle = e.target.value;
+    updatePreview();
+  });
+  el.linkDescInput.addEventListener("input", (e) => {
+    state.linkDescription = e.target.value;
+    updatePreview();
+  });
+
+  el.fileInput.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    state.file = file;
+    el.fileDropLabel.textContent = file ? file.name : "Choose file";
+    el.fileDrop.classList.toggle("has-file", !!file);
+    showFormError(null);
+    updatePreview();
+  });
+  el.fileCaptionInput.addEventListener("input", (e) => {
+    state.fileCaption = e.target.value;
+    updatePreview();
+  });
+
   el.fetchTitleBtn.addEventListener("click", handleFetchTitle);
   el.sendBtn.addEventListener("click", handleSend);
+
+  wireSegmented(el.typeGroup, (value) => {
+    setMessageType(value);
+  });
 
   wireSegmented(el.priorityGroup, (value) => {
     state.priority = value;
@@ -500,6 +699,6 @@
   /* ---------------------------------------------------------------
    * Init
    * --------------------------------------------------------------- */
-  loadData();
   updatePreview();
+  loadFormData();
 })();
