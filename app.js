@@ -44,6 +44,8 @@
     typePanels: document.querySelectorAll(".type-panel"),
 
     summaryInput: document.getElementById("summaryInput"),
+    aiActions: document.getElementById("aiActions"),
+aiStatus: document.getElementById("aiStatus"),
 
     linkUrlInput: document.getElementById("linkUrlInput"),
     linkTitleInput: document.getElementById("linkTitleInput"),
@@ -627,7 +629,81 @@
       state.sending = false;
     }
   }
+/* ---------------------------------------------------------------
+ * AI Assistant
+ * --------------------------------------------------------------- */
+async function runAiAction(action) {
+  const text = el.summaryInput.value.trim();
 
+  if (!text) {
+    showFormError("Write some text first before using AI.");
+    el.summaryInput.focus();
+    return;
+  }
+
+  showFormError(null);
+
+  const buttons = el.aiActions.querySelectorAll(".ai-btn");
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+
+  el.aiStatus.hidden = false;
+  el.aiStatus.textContent = "AI is processing...";
+
+  try {
+    
+    function detectTargetLanguage(value) {
+  const arabicChars = (value.match(/[\u0600-\u06FF]/g) || []).length;
+  const latinChars = (value.match(/[A-Za-z]/g) || []).length;
+
+  if (arabicChars > latinChars) {
+    return "en";
+  }
+
+  return "ar";
+}
+
+const payload = {
+  action,
+  text,
+  language: action === "translate"
+    ? detectTargetLanguage(text)
+    : "ar",
+  tone: "professional",
+};
+
+    const res = await fetch(CONFIG.AI_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await parseResponseSafely(res);
+
+    if (!res.ok || !data || data.success === false || !data.result) {
+      throw new Error("AI request failed.");
+    }
+
+    el.summaryInput.value = data.result;
+    state.summary = data.result;
+
+    updatePreview();
+
+    el.aiStatus.textContent = "AI result applied. Review it before sending.";
+  } catch (err) {
+    console.error(err);
+
+    el.aiStatus.textContent = "Couldn't process this text with AI.";
+    showFormError("AI request failed. Your original text was not changed.");
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
   /* ---------------------------------------------------------------
    * Wire up static fields
    * --------------------------------------------------------------- */
@@ -679,6 +755,18 @@
     state.fileCaption = e.target.value;
     updatePreview();
   });
+
+  el.aiActions.addEventListener("click", (e) => {
+  const btn = e.target.closest(".ai-btn");
+
+  if (!btn) return;
+
+  const action = btn.dataset.aiAction;
+
+  if (!["summarize", "rewrite", "translate"].includes(action)) return;
+
+  runAiAction(action);
+});
 
   el.fetchTitleBtn.addEventListener("click", handleFetchTitle);
   el.sendBtn.addEventListener("click", handleSend);
