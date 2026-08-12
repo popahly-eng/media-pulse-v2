@@ -87,11 +87,50 @@
             <span class="btn__spinner" hidden></span>
             <span class="btn__label">Fetch title</span>
           </button>
+
+          <button id="analyzeNewsBtn" class="btn btn--ghost" type="button">
+  <span class="btn__spinner" hidden></span>
+  <span class="btn__label">Analyze with AI</span>
+</button>
+
         </div>
         <p id="urlHint" class="field-hint">We'll pull the headline automatically once you paste a link.</p>
-      </section>
+        <div id="newsAnalysisCard" class="news-analysis" hidden>
+  <div class="news-analysis__header">
+    <span>AI News Analysis</span>
+  </div>
 
-      <!-- ---- TITLE (NEWS) ---- -->
+  <div class="news-analysis__item">
+    <strong>Headline</strong>
+    <p id="analysisHeadline"></p>
+  </div>
+
+  <div class="news-analysis__item">
+    <strong>Summary</strong>
+    <p id="analysisSummary"></p>
+  </div>
+
+  <div class="news-analysis__meta">
+    <span id="analysisCategory"></span>
+    <span id="analysisRelevance"></span>
+    <span id="analysisPriority"></span>
+  </div>
+<div class="news-analysis__meta">
+  <span id="analysisCategory"></span>
+  <span id="analysisRelevance"></span>
+  <span id="analysisPriority"></span>
+</div>
+
+</div>
+<div class="ai-summary-toggle">
+  <label class="toggle-row" for="includeAiSummary">
+    <input type="checkbox" id="includeAiSummary" />
+    <span>Include AI Summary in message</span>
+  </label>
+</div>
+</section>
+
+<!-- ----- TITLE (NEWS) ----- -->
       <section class="card type-panel" data-type="news" aria-labelledby="title-label">
         <div class="card__head">
           <span class="card__eyebrow">02</span>
